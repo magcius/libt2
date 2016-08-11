@@ -1,5 +1,5 @@
 
-/* An easy-to-read single-file implementation of INFLATE, based on RFC 1951. */
+/* t2_inflate: An easy-to-read single-file implementation of INFLATE, based on RFC 1951. */
 
 /* Written by Jasper St. Pierre <jstpierre@mecheye.net>
  * I license this work into the public domain. */
