@@ -4,15 +4,8 @@
 /* Written by Jasper St. Pierre <jstpierre@mecheye.net>
  * I license this work into the public domain. */
 
-#include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-
-#define t2_d_die(msg) do { fprintf(stderr, "%s, %s:%d\n", msg, __FILE__, __LINE__); asm("int3"); exit(1); } while (0);
-#define t2_d_assert(condition) do { if (!(condition)) { fprintf(stderr, "Assertion failed: %s, %s:%d\n", #condition, __FILE__, __LINE__); asm("int3"); exit(1); } } while (0);
-
-/* A buffer to read / write from. */
+#include <stdint.h>
 
 struct t2_z_buffer {
     uint8_t *data;
@@ -21,6 +14,18 @@ struct t2_z_buffer {
 };
 
 #define T2_Z_BUFFER_FROM_STATIC(buf) (&((struct t2_z_buffer) { .data = buf, .size = sizeof(buf) }))
+
+static void t2_z_inflate (struct t2_z_buffer *buf_in, struct t2_z_buffer *buf_out);
+
+#ifdef T2_Z_IMPLEMENTATION
+
+#include <stdio.h>
+#include <string.h>
+
+#define t2_d_die(msg) do { fprintf(stderr, "%s, %s:%d\n", msg, __FILE__, __LINE__); asm("int3"); exit(1); } while (0);
+#define t2_d_assert(condition) do { if (!(condition)) { fprintf(stderr, "Assertion failed: %s, %s:%d\n", #condition, __FILE__, __LINE__); asm("int3"); exit(1); } } while (0);
+
+/* A buffer to read / write from. */
 
 static void t2_z__buffer_copy (struct t2_z_buffer *out, struct t2_z_buffer *in, ssize_t in_offset, size_t length) {
     t2_d_assert (in->position + in_offset + length < in->size);
@@ -539,8 +544,8 @@ static void t2_z_inflate (struct t2_z_buffer *buf_in, struct t2_z_buffer *buf_ou
     t2_z__inflate (&state);
 }
 
-#define T2_RUN_TESTS
 #ifdef T2_RUN_TESTS
+
 #include "t2_tests.h"
 
 static struct t2_z_buffer buffer_from_cstring (const char *string) {
@@ -594,4 +599,6 @@ static struct t2_t_test tests[] = {
     {},
 };
 
-#endif
+#endif /* T2_RUN_TESTS */
+
+#endif /* T2_IMPLEMENTATION */
