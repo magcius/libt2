@@ -20,6 +20,8 @@ struct t2_z_buffer {
     size_t position;
 };
 
+#define T2_Z_BUFFER_FROM_STATIC(buf) (&((struct t2_z_buffer) { .data = buf, .size = sizeof(buf) }))
+
 static void t2_z__buffer_copy (struct t2_z_buffer *out, struct t2_z_buffer *in, ssize_t in_offset, size_t length) {
     t2_d_assert (in->position + in_offset + length < in->size);
     t2_d_assert (out->position + length < out->size);
@@ -84,7 +86,7 @@ static uint64_t t2_z__bitreader_read (struct t2_z__bitreader *b, int nbits) {
  * to be in memory, there's not much in here -- basically, stuff we pass
  * around to internals so we don't have to pass a bunch of args. */
 
-struct t2_z_state {
+struct t2_z__state {
     struct t2_z_buffer buffer_in;
     struct t2_z_buffer buffer_out;
     struct t2_z__bitreader bitreader;
@@ -238,7 +240,7 @@ static struct t2_z__huffman_table t2_z__build_huffman_table (uint8_t *sym_to_cod
  * To construct a literal / distance distance Huffman table, a Huffman
  * table called HCLEN specifies an alphabet of symbols which specifies
  * some simple RLE and ZLE. */ 
-static struct t2_z__huffman_table t2_z__read_dyn_huffman_table (struct t2_z_state *state, struct t2_z__huffman_table *hclen, size_t count) {
+static struct t2_z__huffman_table t2_z__read_dyn_huffman_table (struct t2_z__state *state, struct t2_z__huffman_table *hclen, size_t count) {
     uint8_t sym_to_code_length[count];
     memset (&sym_to_code_length, 0, count);
 
@@ -279,7 +281,7 @@ static struct t2_z__huffman_table t2_z__read_dyn_huffman_table (struct t2_z_stat
     return t2_z__build_huffman_table (sym_to_code_length, count);
 }
 
-static struct t2_z__huffman_tables t2_z__read_dyn_huffman_tables (struct t2_z_state *state) {
+static struct t2_z__huffman_tables t2_z__read_dyn_huffman_tables (struct t2_z__state *state) {
     struct t2_z__huffman_tables tables = {};
 
     uint8_t hlit  = t2_z__bitreader_read (&state->bitreader, 5);
@@ -380,7 +382,7 @@ static struct t2_z__huffman_tables t2_z__fixed_huffman_tables = {
  * the symbols that come out of the Huffman tables are just lookups.
  * RFC 3.2.5 has these tables.
  */
-static uint16_t t2_z__decode_length (struct t2_z_state *state, uint16_t code) {
+static uint16_t t2_z__decode_length (struct t2_z__state *state, uint16_t code) {
     /* While these could be done arithmetically, I prefer the "raw" nature
      * of the switch statement. */
     switch (code) {
@@ -417,7 +419,7 @@ static uint16_t t2_z__decode_length (struct t2_z_state *state, uint16_t code) {
     }
 }
 
-static uint16_t t2_z__decode_distance (struct t2_z_state *state, uint16_t code) {
+static uint16_t t2_z__decode_distance (struct t2_z__state *state, uint16_t code) {
     switch (code) {
     case 0: return 1;
     case 1: return 2;
@@ -453,7 +455,7 @@ static uint16_t t2_z__decode_distance (struct t2_z_state *state, uint16_t code) 
     }
 }
 
-static void t2_z__read_compressed_block (struct t2_z_state *state, struct t2_z__huffman_tables *tables) {
+static void t2_z__read_compressed_block (struct t2_z__state *state, struct t2_z__huffman_tables *tables) {
     /* The format of a Huffman-compressed block is specified in RFC 3.2.3. */
     while (1) {
         uint16_t op = t2_z__huffman_table_read (&state->bitreader, &tables->literal);
@@ -499,7 +501,7 @@ enum t2_z__block_flags {
     T2_Z__BLOCK_FLAG_FINAL            = 0x01,
 };
 
-static void t2_z__inflate (struct t2_z_state *state) {
+static void t2_z__inflate (struct t2_z__state *state) {
     struct t2_z__bitreader *bitreader = &state->bitreader;
 
     while (1) {
@@ -526,6 +528,15 @@ static void t2_z__inflate (struct t2_z_state *state) {
         if (block_header & T2_Z__BLOCK_FLAG_FINAL)
             break;
     }
+}
+
+static void t2_z_inflate (struct t2_z_buffer *buf_in, struct t2_z_buffer *buf_out) {
+    struct t2_z__state state = {
+        .buffer_in = *buf_in,
+        .buffer_out = *buf_out,
+    };
+    state.bitreader = ((struct t2_z__bitreader) { .buffer = &state.buffer_in });
+    t2_z__inflate (&state);
 }
 
 #define T2_RUN_TESTS
@@ -567,22 +578,12 @@ static int test_bitreader (void) {
 }
 
 static int test_inflate (void) {
-    struct t2_z_state state = {};
-
-    uint8_t buf_in[] = {75, 203, 207, 7, 0};
-    state.buffer_in.data = buf_in;
-    state.buffer_in.size = sizeof (buf_in);
-
+    uint8_t buf_in[] = { 75, 203, 207, 7, 0 };
     uint8_t buf_out[4096] = {};
-    state.buffer_out.data = buf_out;
-    state.buffer_out.size = sizeof (buf_out);
 
-    state.bitreader = ((struct t2_z__bitreader) { .buffer = &state.buffer_in });
-
-    t2_z__inflate (&state);
+    t2_z_inflate (T2_Z_BUFFER_FROM_STATIC (buf_in), T2_Z_BUFFER_FROM_STATIC (buf_out));
 
     t2_t_assert (memcmp (buf_out, "foo", 3) == 0);
-    t2_t_assert (state.buffer_out.position == 3);
 
     return 0;
 }
