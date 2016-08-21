@@ -4,6 +4,8 @@
 /* Written by Jasper St. Pierre <jstpierre@mecheye.net>
  * I license this work into the public domain. */
 
+#pragma once
+
 #include <stdlib.h>
 #include <stdint.h>
 
