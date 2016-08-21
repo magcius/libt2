@@ -2,3 +2,6 @@
 *.html
 *.exe
 *.stackdump
+
+t2_inflate
+t2_json
