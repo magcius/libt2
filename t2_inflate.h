@@ -108,7 +108,7 @@ enum { T2_Z__HUFFMAN_TABLE_MAX_LEN = 15 };
 
 /* Each individual code length has a range of codes, starting with
  * first_code, and continuing on in ascending order for num_codes.
- * The symbol for the Nth code can be found in code_idx_to_symbol. */ 
+ * The symbol for the Nth code can be found in code_idx_to_symbol. */
 struct t2_z__huffman_table_length {
     uint32_t first_code; uint32_t num_codes; uint32_t code_idx_to_symbol[];
 };
@@ -141,7 +141,7 @@ struct t2_z__huffman_table {
     HUFFMAN_LENGTH(15);
 };
 
-/* And some more silly stuff is used to get each code length table. */ 
+/* And some more silly stuff is used to get each code length table. */
 static struct t2_z__huffman_table_length * t2_z__huffman_table_select_length (struct t2_z__huffman_table *table, uint8_t level) {
     switch (level) {
         case 1: return (struct t2_z__huffman_table_length *) &table->length_1;
@@ -175,7 +175,7 @@ static uint64_t t2_z__huffman_table_read (struct t2_z__bitreader *bitreader, str
     /* XXX: This feels "slow" and looks bad but is probably fine
      * since it's likely to be in a register / L1 cache. I still
      * feel the bitreader could do more to support this usecase
-     * though. */ 
+     * though. */
     uint16_t code = 0;
     for (uint8_t i = 0; i < code_length; i++)
         code = (code << 1) | t2_z__bitreader_read (bitreader, 1);
@@ -238,10 +238,10 @@ static struct t2_z__huffman_table t2_z__build_huffman_table (uint8_t *sym_to_cod
 
 /* Dynamic huffman tables are stored in an interesting format that
  * is itself specified in Huffman codes and has some minimal compression.
- * 
+ *
  * To construct a literal / distance distance Huffman table, a Huffman
  * table called HCLEN specifies an alphabet of symbols which specifies
- * some simple RLE and ZLE. */ 
+ * some simple RLE and ZLE. */
 static struct t2_z__huffman_table t2_z__read_dyn_huffman_table (struct t2_z__state *state, struct t2_z__huffman_table *hclen, size_t count) {
     uint8_t sym_to_code_length[count];
     memset (&sym_to_code_length, 0, count);
@@ -259,22 +259,22 @@ static struct t2_z__huffman_table t2_z__read_dyn_huffman_table (struct t2_z__sta
         /* op 0 - 15: literal code length.
          * op 16, NN: Copy the last code length N+3 times.
          * op 17, NNN: Zero the next N+3 code lengths.
-         * op 18, NNNNNNN: Zero the next N+11 code lengths. */ 
+         * op 18, NNNNNNN: Zero the next N+11 code lengths. */
         if (op <= 15) {
             sym_to_code_length[i] = op;
         } else if (op == 16) {
             uint8_t repeat_length = 3 + t2_z__bitreader_read (&state->bitreader, 2);
             uint8_t code_length = sym_to_code_length[i - 1];
             for (uint8_t j = 0; j < repeat_length; j++)
-                sym_to_code_length[i++] = code_length; 
+                sym_to_code_length[i++] = code_length;
         } else if (op == 17) {
             uint8_t repeat_length = 3 + t2_z__bitreader_read (&state->bitreader, 3);
             for (uint8_t j = 0; j < repeat_length; j++)
-                sym_to_code_length[i++] = 0; 
+                sym_to_code_length[i++] = 0;
         } else if (op == 18) {
             uint8_t repeat_length = 11 + t2_z__bitreader_read (&state->bitreader, 7);
             for (uint8_t j = 0; j < repeat_length; j++)
-                sym_to_code_length[i++] = 0; 
+                sym_to_code_length[i++] = 0;
         } else {
             t2_d_die ("Invalid dyn table code length");
         }
@@ -291,7 +291,7 @@ static struct t2_z__huffman_tables t2_z__read_dyn_huffman_tables (struct t2_z__s
     uint8_t hclen = t2_z__bitreader_read (&state->bitreader, 4);
 
     /* First, craft the HCLEN table, which helps us construct the symbol
-     * to code length mapping for the literal / distance tables. */ 
+     * to code length mapping for the literal / distance tables. */
 
     /* The symbols of the HCLEN table are laid out in this order... */
     const uint8_t hclen_symbols[] = { 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 };
@@ -418,7 +418,7 @@ static void t2_z__read_compressed_block (struct t2_z__state *state, struct t2_z_
 
         /* op 0 - 255: literal byte output.
          * op 256: end of block.
-         * op 257..285: distance/length pair, copy part of output buffer. */ 
+         * op 257..285: distance/length pair, copy part of output buffer. */
         if (op <= 255) {
             t2_z__buffer_write_byte (&state->buffer_out, op);
         } else if (op == 256) {
@@ -449,7 +449,7 @@ enum t2_z__block_flags {
     /* Block is compressed with in-band Huffman tables. */
     T2_Z__BLOCK_TYPE_COMPRESSED_DYN   = 0x04,
 
-    /* A flag for whether the block is the final in its series or not... */ 
+    /* A flag for whether the block is the final in its series or not... */
     T2_Z__BLOCK_FLAG_FINAL            = 0x01,
 };
 
@@ -508,7 +508,7 @@ static int test_bitreader (void) {
     struct t2_z_buffer buffer = buffer_from_cstring ("A\xF7\x12\x34\x56\x78");
 
     struct t2_z__bitreader b = {
-        .buffer = &buffer, 
+        .buffer = &buffer,
     };
 
     uint16_t bits;
@@ -516,7 +516,7 @@ static int test_bitreader (void) {
     bits = t2_z__bitreader_read (&b, 8);
     t2_t_assert (bits == 'A');
     bits = t2_z__bitreader_read (&b, 4);
-    t2_t_assert (bits == '\x07'); /* '0111' */ 
+    t2_t_assert (bits == '\x07'); /* '0111' */
     bits = t2_z__bitreader_read (&b, 4);
     t2_t_assert (bits == '\x0F'); /* '1111' */
     bits = t2_z__bitreader_read (&b, 16);
