@@ -195,11 +195,6 @@ static uint64_t t2_z__huffman_table_read (struct t2_z__bitreader *bitreader, str
 
 struct t2_z__huffman_tables {
     struct t2_z__huffman_table literal;
-
-    /* RFC 3.2.6: In the case of FIXED blocks, we don't use
-     * Huffman codes for distance. Instead, we just use 5-bit
-     * values for the distance directly. */
-    int using_fixed_distance_codes;
     struct t2_z__huffman_table distance;
 };
 
@@ -323,66 +318,39 @@ static struct t2_z__huffman_tables t2_z__read_dyn_huffman_tables (struct t2_z__s
     return tables;
 }
 
-/* While I could generate this dynamically, I include a hand-written version
- * here to demonstrate what it looks like, but it should be equivalent to 
- * a progamatically-built version using t2_z__build_huffman_table() ... */
-static struct t2_z__huffman_tables t2_z__fixed_huffman_tables = {
-    /* RFC: 3.2.6 specifies this Huffman table directly. */
-    .literal = {
-        .min_length = 7, .max_length = 9,
-        .length_7 = {
-            /* 7; 256 - 279; 0000000 - 0010111 */
-            .first_code = 0, /* 0000000 */
-            .num_codes = (279 - 256 + 1),
-            .code_idx_to_symbol = {
-                256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268,
-                269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279,
-            }
-        },
-        .length_8 = {
-            /* length 8; symbols 0 - 143, 280 - 287; codes 00110000 - 11000111 */
-            .first_code = 0x30, /* 00110000 */
-            .num_codes = ((143 - 0 + 1) + (287 - 280 + 1)),
-            .code_idx_to_symbol = {
-                 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-                20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
-                40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
-                60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
-                80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99,
-                100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
-                110, 111, 112, 113, 114, 115, 116, 117, 118, 119,
-                120, 121, 122, 123, 124, 125, 126, 127, 128, 129,
-                130, 131, 132, 133, 134, 135, 136, 137, 138, 139,
-                140, 141, 142, 143,
+static struct t2_z__huffman_tables *t2_z__fixed_huffman_tables (void) {
+    static struct t2_z__huffman_tables tables;
+    static int init = 0;
 
-                280, 281, 282, 283, 284, 285, 286, 287,
-            },
-        },
-        .length_9 = {
-            /* length 8; symbols 256 - 279; codes 110010000 - 111111111 */
-            .first_code = 0x190, /* 110010000 */
-            .num_codes = (255 - 144 + 1),
-            .code_idx_to_symbol = {
-                                    144, 145, 146, 147, 148, 149,
-                150, 151, 152, 153, 154, 155, 156, 157, 158, 159,
-                160, 161, 162, 163, 164, 165, 166, 167, 168, 169,
-                170, 171, 172, 173, 174, 175, 176, 177, 178, 179,
-                180, 181, 182, 183, 184, 185, 186, 187, 188, 189,
-                190, 191, 192, 193, 194, 195, 196, 197, 198, 199,
-                200, 201, 202, 203, 204, 205, 206, 207, 208, 209,
-                210, 211, 212, 213, 214, 215, 216, 217, 218, 219,
-                220, 221, 222, 223, 224, 225, 226, 227, 228, 229,
-                230, 231, 232, 233, 234, 235, 236, 237, 238, 239,
-                240, 241, 242, 243, 244, 245, 246, 247, 248, 249,
-                250, 251, 252, 253, 254, 255,
-            },
-        },
-    },
+    if (init)
+        return &tables;
 
-    /* RFC 3.2.6: Fixed huffman tables use fixed-length
-     * 5-bit values directly. */
-    .using_fixed_distance_codes = 1,
-};
+    /* literal */
+    {
+        uint8_t sym_to_code_length[288];
+        size_t sym;
+
+        for (sym =   0; sym <= 143; sym++) sym_to_code_length[sym] = 8;
+        for (sym = 144; sym <= 255; sym++) sym_to_code_length[sym] = 9;
+        for (sym = 256; sym <= 279; sym++) sym_to_code_length[sym] = 7;
+        for (sym = 280; sym <= 287; sym++) sym_to_code_length[sym] = 8;
+
+        tables.literal = t2_z__build_huffman_table (sym_to_code_length, sizeof (sym_to_code_length));
+    }
+
+    /* distance */
+    {
+        uint8_t sym_to_code_length[32];
+        size_t sym;
+
+        for (sym = 0; sym < 32; sym++) sym_to_code_length[sym] = 5;
+
+        tables.distance = t2_z__build_huffman_table (sym_to_code_length, sizeof (sym_to_code_length));
+    }
+
+    init = 1;
+    return &tables;
+}
 
 /* The symbols out of the length / distance tables aren't used directly
  * as length / distance values. No, that would be too easy. Instead,
@@ -477,11 +445,7 @@ static void t2_z__read_compressed_block (struct t2_z__state *state, struct t2_z_
         } else if (op <= 285) {
             uint16_t length, distance;
 
-            if (tables->using_fixed_distance_codes)
-                distance = t2_z__bitreader_read (&state->bitreader, 5);
-            else
-                distance = t2_z__huffman_table_read (&state->bitreader, &tables->distance);
-
+            distance = t2_z__bitreader_read (&state->bitreader, 5);
             distance = t2_z__decode_distance (state, distance);
 
             length = t2_z__decode_length (state, op);
@@ -524,7 +488,7 @@ static void t2_z__inflate (struct t2_z__state *state) {
             /* Just a copy -- easy. */
             t2_z__buffer_copy (&state->buffer_out, &state->buffer_in, 0, length);
         } else if (block_type == T2_Z__BLOCK_TYPE_COMPRESSED_FIXED) {
-            t2_z__read_compressed_block (state, &t2_z__fixed_huffman_tables);
+            t2_z__read_compressed_block (state, t2_z__fixed_huffman_tables ());
         } else if (block_type == T2_Z__BLOCK_TYPE_COMPRESSED_DYN) {
             struct t2_z__huffman_tables tables = t2_z__read_dyn_huffman_tables (state);
             t2_z__read_compressed_block (state, &tables);
