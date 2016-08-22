@@ -2,6 +2,9 @@
 *.html
 *.exe
 *.stackdump
+*~
+\#*\#
 
 t2_inflate
 t2_json
+t2_co
