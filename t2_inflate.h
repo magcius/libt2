@@ -24,7 +24,7 @@ static void t2_z_inflate (struct t2_z_buffer *buf_in, struct t2_z_buffer *buf_ou
 #include <stdio.h>
 #include <string.h>
 
-#define t2_d_die(msg) do { fprintf(stderr, "%s, %s:%d\n", msg, __FILE__, __LINE__); asm("int3"); exit(1); } while (0);
+#define t2_d_die(msg) do { fprintf(stderr, "%s, %s:%d\n", msg, __FILE__, __LINE__); asm("int3"); exit(1); } while (0)
 #define t2_d_assert(condition) do { if (!(condition)) { fprintf(stderr, "Assertion failed: %s, %s:%d\n", #condition, __FILE__, __LINE__); asm("int3"); exit(1); } } while (0);
 
 /* A buffer to read / write from. */
@@ -358,40 +358,21 @@ static struct t2_z__huffman_tables *t2_z__fixed_huffman_tables (void) {
  * RFC 3.2.5 has these tables.
  */
 static uint16_t t2_z__decode_length (struct t2_z__state *state, uint16_t code) {
-    /* While these could be done arithmetically, I prefer the "raw" nature
-     * of the switch statement. */
-    switch (code) {
-    case 257: return 3;
-    case 258: return 4;
-    case 259: return 5;
-    case 260: return 6;
-    case 261: return 7;
-    case 262: return 8;
-    case 263: return 9;
-    case 264: return 10;
-    case 265: return 11 + t2_z__bitreader_read (&state->bitreader, 1);
-    case 266: return 13 + t2_z__bitreader_read (&state->bitreader, 1);
-    case 267: return 15 + t2_z__bitreader_read (&state->bitreader, 1);
-    case 268: return 17 + t2_z__bitreader_read (&state->bitreader, 1);
-    case 269: return 19 + t2_z__bitreader_read (&state->bitreader, 2);
-    case 270: return 22 + t2_z__bitreader_read (&state->bitreader, 2);
-    case 271: return 23 + t2_z__bitreader_read (&state->bitreader, 2);
-    case 272: return 27 + t2_z__bitreader_read (&state->bitreader, 2);
-    case 273: return 31 + t2_z__bitreader_read (&state->bitreader, 2);
-    case 274: return 35 + t2_z__bitreader_read (&state->bitreader, 3);
-    case 275: return 51 + t2_z__bitreader_read (&state->bitreader, 3);
-    case 276: return 59 + t2_z__bitreader_read (&state->bitreader, 3);
-    case 277: return 67 + t2_z__bitreader_read (&state->bitreader, 4);
-    case 278: return 83 + t2_z__bitreader_read (&state->bitreader, 4);
-    case 279: return 99 + t2_z__bitreader_read (&state->bitreader, 4);
-    case 280: return 115 + t2_z__bitreader_read (&state->bitreader, 4);
-    case 281: return 131 + t2_z__bitreader_read (&state->bitreader, 5);
-    case 282: return 163 + t2_z__bitreader_read (&state->bitreader, 5);
-    case 283: return 195 + t2_z__bitreader_read (&state->bitreader, 5);
-    case 284: return 227 + t2_z__bitreader_read (&state->bitreader, 5);
-    case 285: return 258;
-    default: t2_d_die ("Invalid length");
-    }
+    uint16_t base, ebit;
+
+    if (code <= 256) t2_d_die ("Invalid code.");
+    else if (code <= 264) code -= 264, base =   3, ebit = 0;
+    else if (code <= 268) code -= 268, base =  11, ebit = 1;
+    else if (code <= 273) code -= 273, base =  19, ebit = 2;
+    else if (code <= 276) code -= 276, base =  35, ebit = 3;
+    else if (code <= 280) code -= 280, base =  67, ebit = 4;
+    else if (code <= 284) code -= 284, base = 131, ebit = 5;
+    else t2_d_die ("Invalid code.");
+
+    uint16_t res = base + code * ((1 << ebit) - 1);
+    if (ebit)
+        res += t2_z__bitreader_read (&state->bitreader, ebit);
+    return res;
 }
 
 static uint16_t t2_z__decode_distance (struct t2_z__state *state, uint16_t code) {
